@@ -323,6 +323,30 @@ export async function getBusinessData({
     };
   }
 }
+
+export async function getTrendsData({ userUuid, saveToDb = false, debug = false }) {
+  try {
+    const trendsData = await getBusinessTrends({ userUuid, saveToDb, debug });
+
+    return {
+      success: true,
+      summary: trendsData?.summary || "",
+      trends: trendsData?.trends || [],
+      categorizedTrends: trendsData?.categorized_trends || {},
+      validationSummary: trendsData?.validation_summary || null,
+      financialProfile: trendsData?.financial_profile || null,
+      saveResult: trendsData?.save_result || null,
+      debug: debug ? trendsData : undefined,
+    };
+  } catch (error) {
+    console.error("Error in getTrendsData:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 export { learnFromPdf };
 export { analyzeBusinessDocument };
 export { orderBusinessEquipment as orderEquipment };
