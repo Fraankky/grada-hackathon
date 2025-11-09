@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { BusinessWizardProvider, useBusinessWizard } from "@/context/BusinessWizardContext";
 import StepBusiness from "@/components/platform/StepBusiness";
@@ -28,7 +28,9 @@ function BusinessWizardContent() {
 export default function BusinessWizardPage() {
   return (
     <BusinessWizardProvider>
-      <BusinessWizardContent />
+      <Suspense fallback={<div>Loading...</div>}>
+        <BusinessWizardContent />
+      </Suspense>
     </BusinessWizardProvider>
   );
 }

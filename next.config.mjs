@@ -1,12 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://keditech-playground.site/api/:path*',
-      },
-    ];
+  serverExternalPackages: ['@prisma/client', 'prisma'],
+  
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push({
+        '@prisma/client': '@prisma/client',
+        'prisma': 'prisma'
+      });
+    }
+    return config;
   },
 };
 
