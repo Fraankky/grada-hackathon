@@ -1,4 +1,4 @@
-import { getPlanningData } from "@/lib/ai-service";
+import { getBusinessPlanning } from "@/lib/ai-service";
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
@@ -13,7 +13,7 @@ export async function POST(request) {
       );
     }
 
-    const result = await getPlanningData({
+    const result = await getBusinessPlanning({
       userUuid: user_uuid,
       debug: process.env.NODE_ENV === "development",
     });

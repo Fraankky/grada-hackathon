@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { BusinessWizardProvider, useBusinessWizard } from "@/context/BusinessWizardContext";
 import StepEquipment from "@/components/platform/StepEquipment";
@@ -28,7 +28,15 @@ function EquipmentWizardContent() {
 export default function EquipmentWizardPage() {
   return (
     <BusinessWizardProvider>
-      <EquipmentWizardContent />
+      <Suspense fallback={
+        <main className="min-h-screen bg-white text-slate-100 flex items-center justify-center">
+          <div className="w-full max-w-4xl px-4 py-8">
+            <div className="text-center">Loading...</div>
+          </div>
+        </main>
+      }>
+        <EquipmentWizardContent />
+      </Suspense>
     </BusinessWizardProvider>
   );
 }
