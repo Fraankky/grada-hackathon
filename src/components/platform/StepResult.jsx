@@ -96,7 +96,7 @@ export default function StepResult() {
       <Card className="w-full max-w-5xl rounded-2xl shadow-lg border border-border/60">
         <CardHeader className="space-y-2">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]">
-            Step 4 dari 4
+            Step 5 dari 5
           </div>
           <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-500" />

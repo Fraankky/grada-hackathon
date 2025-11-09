@@ -19,6 +19,20 @@ import { UploadCloud, FileText } from "lucide-react";
 import { learnFromPdf, analyzeBusinessDocument } from "@/lib/ai-service";
 import { useBusinessWizard } from "@/context/BusinessWizardContext";
 
+// Safe UUID generator with fallback
+function generateUUID() {
+  // Try to use crypto.randomUUID() if available
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: Generate UUID v4 manually
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function StepUpload() {
   const router = useRouter();
   const {
@@ -27,6 +41,10 @@ export default function StepUpload() {
     mode,
     setMode,
     setFinancialAnalysis,
+    setBusinessTrends,
+    setTrendsSummary,
+    setCategorizedTrends,
+    setValidationSummary,
   } = useBusinessWizard();
 
   const [file, setFile] = useState(null);
@@ -53,7 +71,7 @@ export default function StepUpload() {
 
     setLoading(true);
 
-    const uid = userUuid || crypto.randomUUID();
+    const uid = userUuid || generateUUID();
     setUserUuid(uid);
 
     // 1) belajar dari PDF
@@ -67,9 +85,26 @@ export default function StepUpload() {
       });
 
       // Simpan ke context
-      setFinancialAnalysis(businessAnalysis?.financial_summary || null);
-      setBusinessTrends(businessAnalysis?.trends || []);
-      setTrendsSummary(businessAnalysis?.summary || "");
+      // Map API response structure: response_dashboard contains the actual data
+      const dashboard = businessAnalysis?.response_dashboard || businessAnalysis;
+      
+      // Merge financial_summary and analysis for complete financial data
+      const financialData = {
+        ...(dashboard?.financial_summary || {}),
+        ...(dashboard?.analysis || {}),
+        // Include patterns if available
+        patterns: dashboard?.patterns || businessAnalysis?.response_dashboard?.patterns,
+        // Include recommendations if available
+        recommendations: dashboard?.recommendations || businessAnalysis?.response_dashboard?.recommendations,
+        // Support both structures
+        liquid_capital: dashboard?.analysis?.liquid_capital || dashboard?.financial_summary?.current_balance || dashboard?.financial_summary?.liquid_capital,
+        monthly_cash_flow: dashboard?.analysis?.monthly_cash_flow,
+        risk_profile: dashboard?.analysis?.risk_profile || dashboard?.financial_summary?.risk_profile,
+      };
+      
+      setFinancialAnalysis(financialData);
+      setBusinessTrends(dashboard?.trends || businessAnalysis?.trends || []);
+      setTrendsSummary(businessAnalysis?.response || businessAnalysis?.summary || "");
       setCategorizedTrends(businessAnalysis?.categorized_trends || {});
       setValidationSummary(businessAnalysis?.validation_summary || null);
     }
@@ -90,7 +125,7 @@ export default function StepUpload() {
       <Card className="w-full max-w-xl rounded-2xl shadow-lg border border-border/60">
         <CardHeader className="space-y-2">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]">
-            Step 1 dari 4
+            Step 1 dari 5
           </div>
           <CardTitle className="text-xl md:text-2xl">
             Upload Financial Reports
