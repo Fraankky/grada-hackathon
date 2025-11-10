@@ -1,14 +1,36 @@
 // context/BusinessWizardContext.jsx
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const BusinessWizardContext = createContext();
+
+// Helper functions for localStorage
+const STORAGE_KEY = "grada_wizard_data";
+
+function loadFromStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveToStorage(data) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export function BusinessWizardProvider({ children }) {
   const [userUuid, setUserUuid] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [mode, setMode] = useState(null); // ← TAMBAHKAN INI
+  const [mode, setMode] = useState(null);
   
   // Data analyze
   const [financialAnalysis, setFinancialAnalysis] = useState(null);
@@ -16,6 +38,9 @@ export function BusinessWizardProvider({ children }) {
   const [trendsSummary, setTrendsSummary] = useState("");
   const [categorizedTrends, setCategorizedTrends] = useState({});
   const [validationSummary, setValidationSummary] = useState(null);
+  
+  // Cart items for equipment
+  const [cartItems, setCartItems] = useState([]);
 
   return (
     <BusinessWizardContext.Provider
@@ -24,8 +49,8 @@ export function BusinessWizardProvider({ children }) {
         setUserUuid,
         selectedCategory,
         setSelectedCategory,
-        mode,           // ← TAMBAHKAN INI
-        setMode,        // ← TAMBAHKAN INI
+        mode,
+        setMode,
         financialAnalysis,
         setFinancialAnalysis,
         businessTrends,
@@ -36,6 +61,8 @@ export function BusinessWizardProvider({ children }) {
         setCategorizedTrends,
         validationSummary,
         setValidationSummary,
+        cartItems,
+        setCartItems,
       }}
     >
       {children}

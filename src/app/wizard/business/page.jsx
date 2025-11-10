@@ -1,9 +1,13 @@
 "use client";
 
+<<<<<<< HEAD
+import { Suspense, useEffect } from "react";
+=======
 import { useEffect, Suspense } from "react";
+>>>>>>> 1e40848 (build)
 import { useSearchParams } from "next/navigation";
 import { BusinessWizardProvider, useBusinessWizard } from "@/context/BusinessWizardContext";
-import StepBusiness from "@/components/platform/StepBusiness";
+import StepBusinessChoice from "@/components/platform/StepBusinessChoice";
 
 function BusinessWizardContent() {
   const searchParams = useSearchParams();
@@ -18,8 +22,8 @@ function BusinessWizardContent() {
 
   return (
     <main className="min-h-screen bg-white text-slate-100 flex items-center justify-center">
-      <div className="w-full max-w-4xl px-4 py-8">
-        <StepBusiness />
+      <div className="w-full max-w-6xl px-4 py-8">
+        <StepBusinessChoice />
       </div>
     </main>
   );
@@ -28,8 +32,20 @@ function BusinessWizardContent() {
 export default function BusinessWizardPage() {
   return (
     <BusinessWizardProvider>
+<<<<<<< HEAD
+      <Suspense fallback={
+        <main className="min-h-screen bg-white text-slate-100 flex items-center justify-center">
+          <div className="w-full max-w-4xl px-4 py-8">
+            <div className="text-center">Loading...</div>
+          </div>
+        </main>
+      }>
+=======
       <Suspense fallback={<div>Loading...</div>}>
+>>>>>>> 1e40848 (build)
+        <Suspense fallback={<div>Loading...</div>}>
         <BusinessWizardContent />
+      </Suspense>
       </Suspense>
     </BusinessWizardProvider>
   );

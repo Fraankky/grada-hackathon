@@ -1,8 +1,8 @@
 // platform/StepBusiness.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -13,12 +13,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  ShoppingCart,
-  Package,
-  ExternalLink,
   Lightbulb,
   TrendingUp,
-  AlertCircle,
   Loader2,
   ArrowLeft,
   DollarSign,
@@ -28,90 +24,122 @@ import { useBusinessWizard } from "@/context/BusinessWizardContext";
 
 export default function StepBusiness() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { 
-    userUuid, 
+    userUuid: contextUserUuid, 
+    setUserUuid,
     selectedCategory,
-    // Ambil data dari context (yang disimpan saat upload)
+   
     financialAnalysis,
-    businessTrends,
-    trendsSummary,
-    categorizedTrends,
-    validationSummary
+    businessTrends: contextBusinessTrends,
+    trendsSummary: contextTrendsSummary,
+    categorizedTrends: contextCategorizedTrends,
+    validationSummary: contextValidationSummary,
+    // Setters untuk update context
+    setBusinessTrends,
+    setTrendsSummary,
+    setCategorizedTrends,
+    setValidationSummary,
   } = useBusinessWizard();
 
-  const [loading, setLoading] = useState(true);
-  const [equipmentData, setEquipmentData] = useState(null);
-  const [advisorData, setAdvisorData] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [errorMsg, setErrorMsg] = useState("");
+  // Get userUuid from context, URL params, or localStorage
+  const userUuid = contextUserUuid || searchParams.get("userUuid");
 
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  
+  // Local state for trends data (will be merged with context data)
+  const [trendsData, setTrendsData] = useState(null);
+  
+  // Ref to track if trends data has been fetched to prevent multiple calls
+  const trendsFetchedRef = useRef(false);
+  
+  // Use trends data from API or fallback to context
+  const businessTrends = trendsData?.trends || contextBusinessTrends || [];
+  const trendsSummary = trendsData?.summary || contextTrendsSummary || "";
+  const categorizedTrends = trendsData?.categorized_trends || contextCategorizedTrends || {};
+  const validationSummary = trendsData?.validation_summary || contextValidationSummary || null;
+
+  // Sync userUuid from URL to context if available
   useEffect(() => {
-    if (!userUuid || !selectedCategory) {
-      setLoading(false);
+    const urlUserUuid = searchParams.get("userUuid");
+    if (urlUserUuid && urlUserUuid !== contextUserUuid) {
+      setUserUuid(urlUserUuid);
+    }
+  }, [searchParams, contextUserUuid, setUserUuid]);
+
+  // Fetch trends data from API (only once per userUuid)
+  useEffect(() => {
+    if (!userUuid) {
       return;
     }
 
-    const fetchBusinessData = async () => {
-      setLoading(true);
-      setErrorMsg("");
+    // Prevent multiple calls for the same userUuid
+    if (trendsFetchedRef.current === userUuid) {
+      return;
+    }
 
+    const fetchTrendsData = async () => {
+      // Mark as fetching for this userUuid
+      trendsFetchedRef.current = userUuid;
+      setTrendsLoading(true);
+      
       try {
-        const res = await fetch("/api/business", {
+        const res = await fetch("/api/trends", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_uuid: userUuid,
-            bisnis_kategori: selectedCategory,
+            user_id: userUuid,
           }),
         });
 
         const json = await res.json();
 
         if (json.success) {
-          setEquipmentData(json.equipment);
-          setAdvisorData(json.advisor);
+          // Update local state
+          setTrendsData({
+            trends: json.trends || [],
+            summary: json.summary || "",
+            categorized_trends: json.categorized_trends || {},
+            validation_summary: json.validation_summary || null,
+            financial_profile: json.financial_profile || null,
+          });
+          
+          // Update context for persistence
+          if (json.trends) setBusinessTrends(json.trends);
+          if (json.summary) setTrendsSummary(json.summary);
+          if (json.categorized_trends) setCategorizedTrends(json.categorized_trends);
+          if (json.validation_summary) setValidationSummary(json.validation_summary);
         } else {
-          throw new Error(json.error || "Failed to fetch business data");
+          console.warn("Trends API returned error:", json.error);
+          // Reset ref on error so it can retry if needed
+          trendsFetchedRef.current = null;
+          // If API fails, use context data (already set from upload step)
         }
       } catch (error) {
-        console.error("Error fetching business data:", error);
-        setErrorMsg(error.message || "Terjadi kesalahan memuat data bisnis.");
+        console.error("Error fetching trends data:", error);
+        // Reset ref on error so it can retry if needed
+        trendsFetchedRef.current = null;
+        // If API fails, use context data (already set from upload step)
       } finally {
-        setLoading(false);
+        setTrendsLoading(false);
       }
     };
 
-    fetchBusinessData();
-  }, [userUuid, selectedCategory]);
-
-  const toggleCart = (item) => {
-    const exists = cart.some((p) => p.id === item.id);
-    if (exists) {
-      setCart(cart.filter((p) => p.id !== item.id));
-    } else {
-      setCart([...cart, item]);
-    }
-  };
-
-  const handleCheckout = () => {
-    if (cart.length === 0) {
-      alert("Tambahkan minimal 1 barang ke keranjang!");
-      return;
-    }
-    router.push("/wizard/equipment");
-  };
+    fetchTrendsData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userUuid]); // Only depend on userUuid, setters are stable
 
   const handleBack = () => {
     router.push("/");
   };
 
-  const requiredItems = equipmentData?.required_items || [];
-  const optionalItems = equipmentData?.optional_items || [];
-  const allItems = [...requiredItems, ...optionalItems];
-  const totalCartPrice = cart.reduce(
-    (sum, item) => sum + (item.price || 0),
-    0
-  );
+  const handleNext = () => {
+    const params = new URLSearchParams({ userUuid });
+    if (selectedCategory) {
+      params.set("category", selectedCategory);
+    }
+    router.push(`/wizard/equipment?${params}`);
+  };
 
   // Kalau userUuid nggak ada, anggap sesi sudah habis
   if (!userUuid) {
@@ -141,13 +169,13 @@ export default function StepBusiness() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]">
-                Step 2 dari 4
+                Step 2 dari 5
               </div>
               <CardTitle className="text-xl md:text-2xl">
-                Business Strategy 
+                Business Analysis
               </CardTitle>
               <CardDescription className="text-sm">
-                View recommended business strategies and a list of recommended equipment based on your chosen business category.
+                Analisis keuangan dan rekomendasi bisnis berdasarkan dokumen yang Anda upload.
               </CardDescription>
               {selectedCategory && (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -174,84 +202,239 @@ export default function StepBusiness() {
         <CardContent className="space-y-6">
           {/* ========== TAMPILKAN DATA DARI ANALYZE ========== */}
           
+          {/* API Response Overview Card */}
+          {financialAnalysis && (
+            <Card className="border-l-4 border-l-gray-500 bg-gradient-to-r from-gray-50/80 to-white shadow-md hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2.5">
+                  <CheckCircle className="h-5 w-5 text-gray-800" />
+                  Ringkasan Analisis API
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Data lengkap dari analisis dokumen keuangan Anda
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {financialAnalysis.user_uuid && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">User ID:</span>
+                    <span className="font-mono text-xs font-semibold">
+                      {financialAnalysis.user_uuid.substring(0, 8)}...
+                    </span>
+                  </div>
+                )}
+                {financialAnalysis.current_balance !== undefined && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Saldo Saat Ini:</span>
+                    <span className="font-semibold">
+                      Rp {financialAnalysis.current_balance.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+                {financialAnalysis.patterns && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-gray-900 mb-2">Pola Transaksi:</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {financialAnalysis.patterns.total_transactions && (
+                        <div>
+                          <span className="text-muted-foreground">Total Transaksi:</span>
+                          <span className="ml-2 font-semibold">
+                            {financialAnalysis.patterns.total_transactions.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {financialAnalysis.patterns.total_debet !== undefined && (
+                        <div>
+                          <span className="text-muted-foreground">Total Debet:</span>
+                          <span className="ml-2 font-semibold">
+                            Rp {financialAnalysis.patterns.total_debet.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      )}
+                      {financialAnalysis.patterns.total_kredit !== undefined && (
+                        <div>
+                          <span className="text-muted-foreground">Total Kredit:</span>
+                          <span className="ml-2 font-semibold">
+                            Rp {financialAnalysis.patterns.total_kredit.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Financial Analysis */}
           {financialAnalysis && (
-            <Card className="border-l-4 border-l-blue-500 bg-blue-50/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-blue-600" />
+            <Card className="border-l-4 border-l-gray-500 bg-gradient-to-r from-gray-50/80 to-white shadow-md hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2.5">
+                  <DollarSign className="h-5 w-5 text-gray-800" />
                   Analisis Keuangan Anda
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Modal Cair:</span>
                   <span className="font-semibold">
-                    Rp {financialAnalysis.liquid_capital?.toLocaleString('id-ID') || 0}
+                    Rp {(
+                      financialAnalysis.liquid_capital || 
+                      financialAnalysis.current_balance || 
+                      0
+                    ).toLocaleString('id-ID')}
                   </span>
                 </div>
+                {financialAnalysis.monthly_cash_flow !== undefined && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Arus Kas Bulanan:</span>
+                    <span className={`font-semibold ${
+                      financialAnalysis.monthly_cash_flow >= 0 
+                        ? 'text-gray-700' 
+                        : 'text-gray-500'
+                    }`}>
+                      {financialAnalysis.monthly_cash_flow >= 0 ? '+' : ''}
+                      Rp {Math.abs(financialAnalysis.monthly_cash_flow || 0).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Profil Risiko:</span>
                   <span className="font-semibold">
                     {financialAnalysis.risk_profile || "-"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Range Modal:</span>
-                  <span className="font-semibold text-xs">
-                    Rp {financialAnalysis.capital_range?.min_capital?.toLocaleString('id-ID') || 0} - 
-                    Rp {financialAnalysis.capital_range?.max_capital?.toLocaleString('id-ID') || 0}
-                  </span>
-                </div>
+                {financialAnalysis.capital_range && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Range Modal:</span>
+                    <span className="font-semibold text-xs">
+                      Rp {financialAnalysis.capital_range?.min_capital?.toLocaleString('id-ID') || 0} - 
+                      Rp {financialAnalysis.capital_range?.max_capital?.toLocaleString('id-ID') || 0}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Summary Trends */}
-          {trendsSummary && (
-            <Card className="border-l-4 border-l-green-500 bg-green-50/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-green-600" />
+          {/* Summary Trends / Full Response */}
+          {trendsLoading ? (
+            <Card className="border-l-4 border-l-gray-500 bg-gradient-to-r from-gray-50/80 to-white shadow-md">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-5 w-5 bg-gray-300 rounded animate-pulse" />
+                  <div className="h-5 w-48 bg-gray-300 rounded animate-pulse" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-4/6" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-full mt-4" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                </div>
+                <div className="mt-6 flex items-center justify-center gap-3 pt-4 border-t border-gray-200">
+                  <Loader2 className="animate-spin text-gray-600 h-5 w-5" />
+                  <p className="text-sm text-muted-foreground">Memuat rekomendasi bisnis...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : trendsSummary ? (
+            <Card className="border-l-4 border-l-gray-500 bg-gradient-to-r from-gray-50/80 to-white shadow-md hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2.5">
+                  <Lightbulb className="h-5 w-5 text-gray-800" />
                   Rekomendasi Bisnis Untukmu
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                  {trendsSummary}
-                </p>
+                <div className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                  {trendsSummary.split('\n').map((line, idx) => {
+                    // Format bullet points and headings
+                    if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                      return (
+                        <div key={idx} className="ml-4 my-1">
+                          {line}
+                        </div>
+                      );
+                    }
+                    if (line.trim().endsWith(':')) {
+                      return (
+                        <div key={idx} className="font-semibold text-foreground mt-3 mb-1">
+                          {line}
+                        </div>
+                      );
+                    }
+                    return <div key={idx} className="my-1">{line}</div>;
+                  })}
+                </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           {/* Top Business Trends - Compact Cards */}
-          {businessTrends && businessTrends.length > 0 && (
+          {trendsLoading ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 bg-gray-300 rounded animate-pulse" />
+                <div className="h-4 w-56 bg-gray-300 rounded animate-pulse" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4, 5, 6].map((idx) => (
+                  <Card 
+                    key={idx} 
+                    className="border border-gray-300 bg-white"
+                  >
+                    <CardContent className="p-5 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-4 w-4 bg-gray-200 rounded-full animate-pulse" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-3 bg-gray-200 rounded animate-pulse w-full" />
+                        <div className="h-3 bg-gray-200 rounded animate-pulse w-5/6" />
+                        <div className="h-3 bg-gray-200 rounded animate-pulse w-4/6" />
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse w-24" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Loader2 className="animate-spin text-gray-600 h-4 w-4" />
+                <p className="text-xs text-muted-foreground">Memuat trending business ideas...</p>
+              </div>
+            </div>
+          ) : businessTrends && businessTrends.length > 0 ? (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
+                <TrendingUp className="h-4 w-4 text-gray-700" />
                 Top {businessTrends.length} Trending Business Ideas
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {businessTrends.slice(0, 6).map((trend, idx) => (
                   <Card 
                     key={idx} 
-                    className="border border-purple-200 bg-purple-50/30 hover:shadow-md transition-shadow"
+                    className="border border-gray-300 bg-white hover:border-gray-400 hover:shadow-lg transition-all duration-200"
                   >
-                    <CardContent className="p-4 space-y-2">
+                    <CardContent className="p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-semibold text-sm text-purple-900">
+                        <h4 className="font-semibold text-sm text-gray-900 leading-tight">
                           {trend.kategori_bisnis}
                         </h4>
                         {trend.validated && trend.has_results && (
-                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <CheckCircle className="h-4 w-4 text-gray-800 flex-shrink-0 mt-0.5" />
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {trend.reason}
                       </p>
                       {trend.validation && trend.validation.result_count && (
-                        <p className="text-xs text-green-700 font-medium">
-                          ✓ {trend.validation.result_count.toLocaleString()} hasil pencarian
+                        <p className="text-xs text-gray-800 font-medium flex items-center gap-1">
+                          <span>✓</span>
+                          <span>{trend.validation.result_count.toLocaleString()} hasil pencarian</span>
                         </p>
                       )}
                     </CardContent>
@@ -259,35 +442,35 @@ export default function StepBusiness() {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Categorized Trends - Collapsible */}
-          {categorizedTrends && Object.keys(categorizedTrends).length > 0 && (
-            <Card className="border border-border/60">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-purple-600" />
+          {!trendsLoading && categorizedTrends && Object.keys(categorizedTrends).length > 0 && (
+            <Card className="border border-gray-300 bg-white shadow-md hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2.5">
+                  <TrendingUp className="h-5 w-5 text-gray-800" />
                   Kategori Bisnis Trending
                 </CardTitle>
-                <CardDescription className="text-xs">
+                <CardDescription className="text-xs mt-1">
                   Bisnis yang sedang naik daun berdasarkan kategori
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 {Object.entries(categorizedTrends).map(([category, trends]) => (
-                  <div key={category} className="border-l-4 border-purple-500 pl-4 space-y-2">
-                    <h4 className="font-semibold text-sm text-purple-900">{category}</h4>
+                  <div key={category} className="border-l-4 border-gray-500 pl-5 space-y-2.5">
+                    <h4 className="font-semibold text-sm text-gray-900">{category}</h4>
                     <ul className="space-y-1.5">
                       {trends.map((trend, idx) => (
                         <li key={idx} className="text-xs text-muted-foreground flex items-start gap-2">
-                          <span className="text-purple-600 mt-0.5">•</span>
+                          <span className="text-gray-600 mt-0.5">•</span>
                           <div className="flex-1">
                             <span className="font-medium text-foreground">
                               {trend.kategori_bisnis}
                             </span>
                             : {trend.reason}
                             {trend.validated && trend.has_results && (
-                              <span className="ml-2 text-green-600 font-medium">
+                              <span className="ml-2 text-gray-700 font-medium">
                                 ✓ ({trend.validation?.result_count} hasil)
                               </span>
                             )}
@@ -315,283 +498,6 @@ export default function StepBusiness() {
             </Card>
           )}
 
-          {/* ========== DATA EQUIPMENT & STRATEGI (EXISTING) ========== */}
-
-          {loading && (
-            <Card className="border border-border/60">
-              <CardContent className="py-10 flex flex-col items-center gap-3">
-                <Loader2 className="animate-spin text-muted-foreground" size={28} />
-                <p className="text-sm text-muted-foreground">
-                  Memuat data equipment & strategi...
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {errorMsg && !loading && (
-            <p className="text-xs text-red-500">{errorMsg}</p>
-          )}
-
-          {!loading && !errorMsg && (
-            <>
-              {/* Strategi bisnis */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  Strategi Bisnis
-                </h3>
-
-                {advisorData?.recommendations?.length > 0 && (
-                  <Card className="border border-border/60 bg-muted/40">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Lightbulb className="h-4 w-4 text-primary" />
-                        Rekomendasi Utama
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {advisorData.recommendations.map((rec, idx) => (
-                        <div
-                          key={idx}
-                          className="border-l-2 border-primary/60 pl-3"
-                        >
-                          <p className="text-xs md:text-sm text-muted-foreground">
-                            {rec}
-                          </p>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {advisorData?.strategies?.length > 0 && (
-                  <Card className="border border-border/60 bg-muted/40">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-emerald-500" />
-                        Strategi Operasional
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {advisorData.strategies.map((strategy, idx) => (
-                        <div
-                          key={idx}
-                          className="border-l-2 border-emerald-400/70 pl-3"
-                        >
-                          <p className="text-xs md:text-sm text-muted-foreground">
-                            {strategy}
-                          </p>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {advisorData?.warnings?.length > 0 && (
-                  <Card className="border border-red-200 bg-red-50">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2 text-red-700">
-                        <AlertCircle className="h-4 w-4" />
-                        Hal yang Perlu Diwaspadai
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {advisorData.warnings.map((warning, idx) => (
-                        <div
-                          key={idx}
-                          className="border-l-2 border-red-400 pl-3"
-                        >
-                          <p className="text-xs md:text-sm text-red-700">
-                            {warning}
-                          </p>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Peralatan */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Package className="h-4 w-4 text-primary" />
-                  Peralatan yang Dibutuhkan
-                </h3>
-
-                {/* Required */}
-                {requiredItems.length > 0 && (
-                  <>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Peralatan wajib
-                    </p>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {requiredItems.map((item, idx) => {
-                        const selected = cart.some(
-                          (p) => p.id === item.id || p.name === item.name
-                        );
-                        return (
-                          <Card
-                            key={item.id || idx}
-                            className={`border transition ${
-                              selected
-                                ? "border-primary bg-primary/5"
-                                : "border-border/60 bg-background"
-                            }`}
-                          >
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">
-                                {item.name}
-                              </CardTitle>
-                              <CardDescription className="text-xs">
-                                Rp {(item.price || 0).toLocaleString()}
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              <p className="text-xs md:text-sm text-muted-foreground">
-                                {item.description ||
-                                  "Peralatan wajib untuk operasional."}
-                              </p>
-                              <div className="flex gap-2">
-                                {item.link && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    onClick={() =>
-                                      window.open(item.link, "_blank")
-                                    }
-                                    className="flex-1 flex items-center gap-1"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                    Lihat
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  type="button"
-                                  onClick={() =>
-                                    toggleCart({
-                                      ...item,
-                                      id: item.id || idx,
-                                    })
-                                  }
-                                  className="flex-1"
-                                >
-                                  {selected ? "Hapus" : "Tambah"}
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {/* Optional */}
-                {optionalItems.length > 0 && (
-                  <>
-                    <p className="text-xs font-medium text-muted-foreground mt-2">
-                      Peralatan opsional
-                    </p>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {optionalItems.map((item, idx) => {
-                        const selected = cart.some(
-                          (p) => p.id === item.id || p.name === item.name
-                        );
-                        return (
-                          <Card
-                            key={item.id || `opt-${idx}`}
-                            className={`border transition ${
-                              selected
-                                ? "border-primary bg-primary/5"
-                                : "border-border/60 bg-background"
-                            }`}
-                          >
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">
-                                {item.name}
-                              </CardTitle>
-                              <CardDescription className="text-xs">
-                                Rp {(item.price || 0).toLocaleString()}
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              <p className="text-xs md:text-sm text-muted-foreground">
-                                {item.description || "Peralatan tambahan."}
-                              </p>
-                              <div className="flex gap-2">
-                                {item.link && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    onClick={() =>
-                                      window.open(item.link, "_blank")
-                                    }
-                                    className="flex-1 flex items-center gap-1"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                    Lihat
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  type="button"
-                                  onClick={() =>
-                                    toggleCart({
-                                      ...item,
-                                      id: item.id || `opt-${idx}`,
-                                    })
-                                  }
-                                  className="flex-1"
-                                >
-                                  {selected ? "Hapus" : "Tambah"}
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {allItems.length === 0 && (
-                  <Card className="border border-border/60 bg-muted/40">
-                    <CardContent className="py-8 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        Tidak ada data equipment untuk kategori ini. Coba
-                        kategori lain atau hubungi support.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Ringkasan keranjang */}
-              {allItems.length > 0 && (
-                <Card className="border border-border/60 bg-muted/40">
-                  <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">
-                        Total Keranjang:
-                      </span>
-                    </div>
-                    <div className="text-right text-sm">
-                      <div className="font-semibold">
-                        Rp {totalCartPrice.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {cart.length} item dipilih
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
         </CardContent>
 
         <CardFooter className="flex flex-col md:flex-row gap-3 md:justify-between md:items-center">
@@ -607,10 +513,9 @@ export default function StepBusiness() {
           </Button>
           <Button
             className="w-full md:w-auto"
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
+            onClick={handleNext}
           >
-            Checkout & Lanjut ke Peralatan ({cart.length})
+            Lanjut ke Equipment & Strategy
           </Button>
         </CardFooter>
       </Card>

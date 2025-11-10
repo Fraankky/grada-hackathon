@@ -20,7 +20,10 @@ export default function Page() {
   // Redirect on successful login
   useEffect(() => {
     if (state?.status === "success") {
-      router.push("/");
+      // Get redirect parameter from URL or default to home
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get('redirect') || '/';
+      router.push(redirectTo);
     }
   }, [state, router]);
 

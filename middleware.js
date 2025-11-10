@@ -1,11 +1,25 @@
 import { NextResponse } from 'next/server';
-import { getCurrentSession } from './src/services/auth';
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/login',
+    '/register',
+    '/api/auth',
+  ];
+
+  // Check if current path is a public route
+  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+  
+  // Allow Google OAuth callback
+  if (pathname.startsWith('/callback/google')) {
+    return NextResponse.next();
+  }
+
   // Allow access to auth routes without authentication
-  if (pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/api/auth')) {
+  if (isPublicRoute) {
     return NextResponse.next();
   }
 
@@ -18,24 +32,21 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  try {
-    // Check if user is authenticated
-    const session = await getCurrentSession();
+  // Check if session cookie exists (lightweight check without database)
+  // Actual session validation happens in route handlers/layouts
+  const sessionCookie = request.cookies.get('session');
 
-    if (!session) {
-      // Redirect to login if not authenticated
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // User is authenticated, allow access
-    return NextResponse.next();
-  } catch (error) {
-    console.error('Auth middleware error:', error);
-    // On error, redirect to login
+  if (!sessionCookie) {
+    // Redirect to login if no session cookie
     const loginUrl = new URL('/login', request.url);
+    // Preserve the original URL as a redirect parameter
+    loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
+
+  // Session cookie exists, allow access
+  // Note: Full session validation with Prisma happens in server components/API routes
+  return NextResponse.next();
 }
 
 export const config = {

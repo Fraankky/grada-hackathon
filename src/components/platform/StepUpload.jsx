@@ -19,6 +19,20 @@ import { UploadCloud, FileText } from "lucide-react";
 import { learnFromPdf, analyzeBusinessDocument } from "@/lib/ai-service";
 import { useBusinessWizard } from "@/context/BusinessWizardContext";
 
+// Safe UUID generator with fallback
+function generateUUID() {
+  // Try to use crypto.randomUUID() if available
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: Generate UUID v4 manually
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function StepUpload() {
   const router = useRouter();
   const {
@@ -27,6 +41,10 @@ export default function StepUpload() {
     mode,
     setMode,
     setFinancialAnalysis,
+    setBusinessTrends,
+    setTrendsSummary,
+    setCategorizedTrends,
+    setValidationSummary,
   } = useBusinessWizard();
 
   const [file, setFile] = useState(null);
@@ -40,14 +58,13 @@ export default function StepUpload() {
   };
 
   const handleNext = async () => {
-  try {
-    setErrorMsg("");
     if (!file) {
-      setErrorMsg("Silakan upload file PDF terlebih dahulu.");
+      setErrorMsg("Pilih file PDF terlebih dahulu.");
       return;
     }
+
     if (!mode) {
-      setErrorMsg("Pilih dulu jenis analisis: Bisnis atau Crypto.");
+      setErrorMsg("Pilih mode (Bisnis atau Investasi Crypto).");
       return;
     }
 
@@ -56,15 +73,21 @@ export default function StepUpload() {
     const uid = userUuid || crypto.randomUUID();
     setUserUuid(uid);
 
-    // 1) belajar dari PDF
-    await learnFromPdf({ file, userUuid: uid, debug: false });
+      // 2) Upload PDF and let AI learn from it
+      console.log("📤 Uploading PDF to learnFromPdf API...");
+      const learnResult = await learnFromPdf({ file, userUuid: uuid, debug: true });
+      console.log("✅ Learn result:", learnResult);
 
-    // 2) kalau pilih bisnis → analisis keuangan bisnis
-    if (mode === "business") {
-      const businessAnalysis = await analyzeBusinessDocument({
-        userUuid: uid,
-        debug: false,
-      });
+      // 3) Analyze business document
+      console.log("📊 Calling analyzeBusinessDocument API...");
+      const analyzeResult = await analyzeBusinessDocument({ userUuid: uuid, debug: true });
+      console.log("✅ Analyze result:", analyzeResult);
+
+      // 4) Get trends data
+      console.log("📈 Calling getTrendsData API...");
+      const { getTrendsData } = await import("@/lib/ai-service");
+      const trendsResult = await getTrendsData({ userUuid: uuid, debug: true });
+      console.log("✅ Trends result:", trendsResult);
 
       // Simpan ke context
       setFinancialAnalysis(businessAnalysis?.financial_summary || null);
@@ -74,23 +97,26 @@ export default function StepUpload() {
       setValidationSummary(businessAnalysis?.validation_summary || null);
     }
 
-    // 3) redirect ke step berikutnya dengan userUuid sebagai param
-    const params = new URLSearchParams({ userUuid: uid });
-    router.push(mode === "business" ? `/wizard/business?${params}` : `/wizard/crypto?${params}`);
-  } catch (err) {
-    console.error(err);
-    setErrorMsg(err.message || "Terjadi kesalahan.");
-  } finally {
-    setLoading(false);
-  }
-};
+      // 6) Navigate based on mode
+      if (mode === "business") {
+        router.push(`/wizard/business?userUuid=${uuid}`);
+      } else if (mode === "crypto") {
+        router.push(`/wizard/crypto?userUuid=${uuid}`);
+      }
+    } catch (err) {
+      console.error("❌ Error in handleNext:", err);
+      setErrorMsg(err.message || "Gagal memproses dokumen. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white to-muted px-4 py-8 flex items-center justify-center">
       <Card className="w-full max-w-xl rounded-2xl shadow-lg border border-border/60">
         <CardHeader className="space-y-2">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]">
-            Step 1 dari 4
+            Step 1 dari 5
           </div>
           <CardTitle className="text-xl md:text-2xl">
             Upload Financial Reports

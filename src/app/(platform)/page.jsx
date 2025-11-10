@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 import StepUpload from "@/components/platform/StepUpload";
 import StepResult from "@/components/platform/StepResult";
