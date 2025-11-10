@@ -1,8 +1,9 @@
 // platform/StepEquipment.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -22,27 +23,21 @@ import {
   Loader2,
   ArrowLeft,
 } from "lucide-react";
-import { useBusinessWizard } from "@/context/BusinessWizardContext";
+
+import { getBusinessData, orderEquipment } from "@/lib/ai-service";
 
 export default function StepEquipment() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const {
-    userUuid: contextUserUuid,
-    selectedCategory,
-  } = useBusinessWizard();
 
-  // Get userUuid from context or URL params
-  const userUuid = contextUserUuid || searchParams.get("userUuid");
-  const category = selectedCategory || searchParams.get("category");
-
+  const [equipment, setEquipment] = useState(null);
+  const [advisor, setAdvisor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [equipmentData, setEquipmentData] = useState(null);
   const [advisorData, setAdvisorData] = useState(null);
   const [cart, setCart] = useState([]);
   const [errorMsg, setErrorMsg] = useState("");
   const [ordering, setOrdering] = useState(false);
-  const [orderData, setOrderData] = useState(null);
+  const [cartItems, setCartItems] = useState([]);
 
   useEffect(() => {
     if (!userUuid || !category) {
@@ -117,21 +112,16 @@ export default function StepEquipment() {
         }),
       });
 
-      const json = await res.json();
-
-      if (json.success) {
-        // Save order data to state/context if needed
-        setOrderData(json.response_dashboard || json);
-        
-        // Navigate to result page with order data
-        const params = new URLSearchParams({ userUuid });
-        if (category) {
-          params.set("category", category);
+      if (result.success) {
+        if (onCheckoutSuccess) {
+          onCheckoutSuccess({
+            cart: cartItems,
+            order: result.order,
+            advisor,
+          });
+        } else {
+          router.push("/wizard/result");
         }
-        if (json.response_dashboard?.order_id) {
-          params.set("orderId", json.response_dashboard.order_id);
-        }
-        router.push(`/wizard/result?${params}`);
       } else {
         throw new Error(json.error || "Gagal memproses order.");
       }
@@ -201,6 +191,7 @@ export default function StepEquipment() {
               variant="ghost"
               size="icon"
               type="button"
+              onClick={onBack}
               className="hidden md:inline-flex"
               onClick={handleBack}
             >
@@ -503,7 +494,7 @@ export default function StepEquipment() {
             size="sm"
             type="button"
             className="w-full md:w-auto"
-            onClick={handleBack}
+            onClick={onBack}
           >
             <ArrowLeft className="h-3.5 w-3.5 mr-1" />
             Kembali

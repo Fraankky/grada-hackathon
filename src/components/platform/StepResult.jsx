@@ -18,6 +18,7 @@ import {
   ClipboardList,
   ArrowLeft,
   Home,
+  Loader2,
 } from "lucide-react";
 
 import { getBusinessPlanning } from "@/lib/ai-service";
@@ -25,7 +26,12 @@ import { useBusinessWizard } from "@/context/BusinessWizardContext";
 
 export default function StepResult() {
   const router = useRouter();
-  const { userUuid, selectedCategory, cartItems } = useBusinessWizard();
+  const { 
+    userUuid, 
+    selectedCategory, 
+    cartItems,
+    financialAnalysis,
+  } = useBusinessWizard();
 
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,14 +49,16 @@ export default function StepResult() {
         setLoading(true);
         setErrorMsg("");
 
-        const planning = await getBusinessPlanning({
+        console.log("📋 Calling getBusinessPlanning API...");
+        const planningResult = await getBusinessPlanning({
           userUuid,
-          debug: false,
+          debug: true,
         });
+        console.log("✅ Planning result:", planningResult);
 
-        setPlan(planning);
+        setPlan(planningResult);
       } catch (err) {
-        console.error(err);
+        console.error("❌ Error fetching planning:", err);
         setErrorMsg(err.message || "Gagal memuat rencana bisnis.");
       } finally {
         setLoading(false);
@@ -59,11 +67,11 @@ export default function StepResult() {
   }, [userUuid]);
 
   const handleBack = () => {
-    const params = new URLSearchParams({ userUuid });
-    router.push(`/wizard/equipment?${params}`);
+    router.push(`/wizard/equipment?userUuid=${userUuid}`);
   };
 
   const handleFinish = () => {
+    // Clear wizard state and go back to start
     router.push("/");
   };
 
@@ -121,13 +129,22 @@ export default function StepResult() {
 
         <CardContent className="space-y-6">
           {loading && (
-            <p className="text-xs text-muted-foreground">
-              Menyiapkan rencana bisnis...
-            </p>
+            <Card className="border border-border/60">
+              <CardContent className="py-10 flex flex-col items-center gap-3">
+                <Loader2 className="animate-spin text-muted-foreground" size={28} />
+                <p className="text-sm text-muted-foreground">
+                  Menyiapkan rencana bisnis strategis...
+                </p>
+              </CardContent>
+            </Card>
           )}
 
-          {errorMsg && (
-            <p className="text-xs text-red-500">{errorMsg}</p>
+          {errorMsg && !loading && (
+            <Card className="border border-red-200 bg-red-50">
+              <CardContent className="py-6 text-center">
+                <p className="text-sm text-red-600">{errorMsg}</p>
+              </CardContent>
+            </Card>
           )}
 
           {!loading && (
@@ -200,17 +217,27 @@ export default function StepResult() {
                     <h3 className="font-semibold">
                       Ringkasan Peralatan yang Dibeli
                     </h3>
-                    {cartItems.length ? (
-                      <ul className="list-disc ml-5 space-y-1">
-                        {cartItems.map((item) => (
-                          <li key={item.id}>
-                            {item.name}
-                            {item.price && (
-                              <span className="font-medium"> — {item.price}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                    {cartItems && cartItems.length > 0 ? (
+                      <>
+                        <ul className="list-disc ml-5 space-y-1">
+                          {cartItems.map((item) => (
+                            <li key={item.id}>
+                              {item.name}
+                              {item.price && (
+                                <span className="font-medium"> — Rp {Number(item.price).toLocaleString()}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 pt-2 border-t">
+                          <div className="flex justify-between items-center font-semibold">
+                            <span>Total:</span>
+                            <span>
+                              Rp {cartItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <p className="text-muted-foreground">
                         Tidak ada data peralatan yang tersimpan di keranjang.

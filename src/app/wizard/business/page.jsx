@@ -7,7 +7,7 @@ import { useEffect, Suspense } from "react";
 >>>>>>> 1e40848 (build)
 import { useSearchParams } from "next/navigation";
 import { BusinessWizardProvider, useBusinessWizard } from "@/context/BusinessWizardContext";
-import StepBusiness from "@/components/platform/StepBusiness";
+import StepBusinessChoice from "@/components/platform/StepBusinessChoice";
 
 function BusinessWizardContent() {
   const searchParams = useSearchParams();
@@ -22,8 +22,8 @@ function BusinessWizardContent() {
 
   return (
     <main className="min-h-screen bg-white text-slate-100 flex items-center justify-center">
-      <div className="w-full max-w-4xl px-4 py-8">
-        <StepBusiness />
+      <div className="w-full max-w-6xl px-4 py-8">
+        <StepBusinessChoice />
       </div>
     </main>
   );

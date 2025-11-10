@@ -28,79 +28,16 @@ function saveToStorage(data) {
 }
 
 export function BusinessWizardProvider({ children }) {
-  // Initialize state with null to ensure server/client match
-  const [userUuid, setUserUuidState] = useState(null);
-  const [selectedCategory, setSelectedCategoryState] = useState(null);
-  const [mode, setModeState] = useState(null);
+  const [userUuid, setUserUuid] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [mode, setMode] = useState(null); // ← TAMBAHKAN INI
   
   // Data analyze
-  const [financialAnalysis, setFinancialAnalysisState] = useState(null);
-  const [businessTrends, setBusinessTrendsState] = useState([]);
-  const [trendsSummary, setTrendsSummaryState] = useState("");
-  const [categorizedTrends, setCategorizedTrendsState] = useState({});
-  const [validationSummary, setValidationSummaryState] = useState(null);
-
-  // Load from localStorage only on client side after hydration
-  useEffect(() => {
-    const stored = loadFromStorage();
-    if (stored) {
-      if (stored.userUuid) setUserUuidState(stored.userUuid);
-      if (stored.selectedCategory) setSelectedCategoryState(stored.selectedCategory);
-      if (stored.mode) setModeState(stored.mode);
-      if (stored.financialAnalysis) setFinancialAnalysisState(stored.financialAnalysis);
-      if (stored.businessTrends) setBusinessTrendsState(stored.businessTrends);
-      if (stored.trendsSummary) setTrendsSummaryState(stored.trendsSummary);
-      if (stored.categorizedTrends) setCategorizedTrendsState(stored.categorizedTrends);
-      if (stored.validationSummary) setValidationSummaryState(stored.validationSummary);
-    }
-  }, []);
-
-  // Wrapper functions that also save to localStorage
-  const setUserUuid = (uuid) => {
-    setUserUuidState(uuid);
-  };
-
-  const setSelectedCategory = (category) => {
-    setSelectedCategoryState(category);
-  };
-
-  const setMode = (newMode) => {
-    setModeState(newMode);
-  };
-
-  const setFinancialAnalysis = (data) => {
-    setFinancialAnalysisState(data);
-  };
-
-  const setBusinessTrends = (trends) => {
-    setBusinessTrendsState(trends);
-  };
-
-  const setTrendsSummary = (summary) => {
-    setTrendsSummaryState(summary);
-  };
-
-  const setCategorizedTrends = (trends) => {
-    setCategorizedTrendsState(trends);
-  };
-
-  const setValidationSummary = (summary) => {
-    setValidationSummaryState(summary);
-  };
-
-  // Save to localStorage whenever any state changes
-  useEffect(() => {
-    saveToStorage({
-      userUuid,
-      selectedCategory,
-      mode,
-      financialAnalysis,
-      businessTrends,
-      trendsSummary,
-      categorizedTrends,
-      validationSummary,
-    });
-  }, [userUuid, selectedCategory, mode, financialAnalysis, businessTrends, trendsSummary, categorizedTrends, validationSummary]);
+  const [financialAnalysis, setFinancialAnalysis] = useState(null);
+  const [businessTrends, setBusinessTrends] = useState([]);
+  const [trendsSummary, setTrendsSummary] = useState("");
+  const [categorizedTrends, setCategorizedTrends] = useState({});
+  const [validationSummary, setValidationSummary] = useState(null);
 
   return (
     <BusinessWizardContext.Provider
@@ -121,6 +58,8 @@ export function BusinessWizardProvider({ children }) {
         setCategorizedTrends,
         validationSummary,
         setValidationSummary,
+        cartItems,
+        setCartItems,
       }}
     >
       {children}

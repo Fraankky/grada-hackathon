@@ -1,9 +1,5 @@
 function getBaseUrl() {
-  // Check if we're in server-side (API routes) or client-side
-  const isServer = typeof window === 'undefined';
-  
-  // In development, use relative URL for client-side to leverage Next.js proxy
-  // But for server-side, we need absolute URL
+  // In development, use relative URL to leverage Next.js proxy
   if (process.env.NODE_ENV === 'development') {
     if (isServer) {
       // Server-side: use the actual API base URL or default to the rewrite destination

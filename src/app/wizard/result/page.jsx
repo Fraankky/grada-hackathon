@@ -22,7 +22,7 @@ function ResultWizardContent() {
 
   return (
     <main className="min-h-screen bg-white text-slate-100 flex items-center justify-center">
-      <div className="w-full max-w-4xl px-4 py-8">
+      <div className="w-full max-w-6xl px-4 py-8">
         <StepResult />
       </div>
     </main>

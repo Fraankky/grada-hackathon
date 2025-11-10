@@ -29,7 +29,7 @@ export default function StepBusiness() {
     userUuid: contextUserUuid, 
     setUserUuid,
     selectedCategory,
-    // Ambil data dari context (yang disimpan saat upload)
+   
     financialAnalysis,
     businessTrends: contextBusinessTrends,
     trendsSummary: contextTrendsSummary,
@@ -485,11 +485,11 @@ export default function StepBusiness() {
           )}
 
           {/* Validation Summary */}
-          {!trendsLoading && validationSummary && validationSummary.serpapi_used && (
-            <Card className="border border-gray-300 bg-gradient-to-r from-gray-50/80 to-white shadow-sm">
-              <CardContent className="py-4 flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-gray-800 flex-shrink-0" />
-                <p className="text-sm text-gray-800">
+          {validationSummary && validationSummary.serpapi_used && (
+            <Card className="border border-yellow-200 bg-yellow-50/50">
+              <CardContent className="py-3 flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-yellow-700 flex-shrink-0" />
+                <p className="text-sm text-yellow-800">
                   <span className="font-semibold">{validationSummary.validated_count}</span> dari{" "}
                   <span className="font-semibold">{validationSummary.total_count}</span> trends 
                   telah divalidasi menggunakan SerpAPI

@@ -58,67 +58,58 @@ export default function StepUpload() {
   };
 
   const handleNext = async () => {
-  try {
-    setErrorMsg("");
     if (!file) {
-      setErrorMsg("Silakan upload file PDF terlebih dahulu.");
+      setErrorMsg("Pilih file PDF terlebih dahulu.");
       return;
     }
+
     if (!mode) {
-      setErrorMsg("Pilih dulu jenis analisis: Bisnis atau Crypto.");
+      setErrorMsg("Pilih mode (Bisnis atau Investasi Crypto).");
       return;
     }
 
     setLoading(true);
 
-    const uid = userUuid || generateUUID();
+    const uid = userUuid || crypto.randomUUID();
     setUserUuid(uid);
 
-    // 1) belajar dari PDF
-    await learnFromPdf({ file, userUuid: uid, debug: false });
+      // 2) Upload PDF and let AI learn from it
+      console.log("📤 Uploading PDF to learnFromPdf API...");
+      const learnResult = await learnFromPdf({ file, userUuid: uuid, debug: true });
+      console.log("✅ Learn result:", learnResult);
 
-    // 2) kalau pilih bisnis → analisis keuangan bisnis
-    if (mode === "business") {
-      const businessAnalysis = await analyzeBusinessDocument({
-        userUuid: uid,
-        debug: false,
-      });
+      // 3) Analyze business document
+      console.log("📊 Calling analyzeBusinessDocument API...");
+      const analyzeResult = await analyzeBusinessDocument({ userUuid: uuid, debug: true });
+      console.log("✅ Analyze result:", analyzeResult);
+
+      // 4) Get trends data
+      console.log("📈 Calling getTrendsData API...");
+      const { getTrendsData } = await import("@/lib/ai-service");
+      const trendsResult = await getTrendsData({ userUuid: uuid, debug: true });
+      console.log("✅ Trends result:", trendsResult);
 
       // Simpan ke context
-      // Map API response structure: response_dashboard contains the actual data
-      const dashboard = businessAnalysis?.response_dashboard || businessAnalysis;
-      
-      // Merge financial_summary and analysis for complete financial data
-      const financialData = {
-        ...(dashboard?.financial_summary || {}),
-        ...(dashboard?.analysis || {}),
-        // Include patterns if available
-        patterns: dashboard?.patterns || businessAnalysis?.response_dashboard?.patterns,
-        // Include recommendations if available
-        recommendations: dashboard?.recommendations || businessAnalysis?.response_dashboard?.recommendations,
-        // Support both structures
-        liquid_capital: dashboard?.analysis?.liquid_capital || dashboard?.financial_summary?.current_balance || dashboard?.financial_summary?.liquid_capital,
-        monthly_cash_flow: dashboard?.analysis?.monthly_cash_flow,
-        risk_profile: dashboard?.analysis?.risk_profile || dashboard?.financial_summary?.risk_profile,
-      };
-      
-      setFinancialAnalysis(financialData);
-      setBusinessTrends(dashboard?.trends || businessAnalysis?.trends || []);
-      setTrendsSummary(businessAnalysis?.response || businessAnalysis?.summary || "");
+      setFinancialAnalysis(businessAnalysis?.financial_summary || null);
+      setBusinessTrends(businessAnalysis?.trends || []);
+      setTrendsSummary(businessAnalysis?.summary || "");
       setCategorizedTrends(businessAnalysis?.categorized_trends || {});
       setValidationSummary(businessAnalysis?.validation_summary || null);
     }
 
-    // 3) redirect ke step berikutnya dengan userUuid sebagai param
-    const params = new URLSearchParams({ userUuid: uid });
-    router.push(mode === "business" ? `/wizard/business?${params}` : `/wizard/crypto?${params}`);
-  } catch (err) {
-    console.error(err);
-    setErrorMsg(err.message || "Terjadi kesalahan.");
-  } finally {
-    setLoading(false);
-  }
-};
+      // 6) Navigate based on mode
+      if (mode === "business") {
+        router.push(`/wizard/business?userUuid=${uuid}`);
+      } else if (mode === "crypto") {
+        router.push(`/wizard/crypto?userUuid=${uuid}`);
+      }
+    } catch (err) {
+      console.error("❌ Error in handleNext:", err);
+      setErrorMsg(err.message || "Gagal memproses dokumen. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white to-muted px-4 py-8 flex items-center justify-center">
