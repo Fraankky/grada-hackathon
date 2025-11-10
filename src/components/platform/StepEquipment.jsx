@@ -12,7 +12,6 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   ShoppingCart,
   Package,
@@ -25,22 +24,25 @@ import {
 } from "lucide-react";
 
 import { getBusinessData, orderEquipment } from "@/lib/ai-service";
+import { useBusinessWizard } from "@/context/BusinessWizardContext";
 
 export default function StepEquipment() {
   const router = useRouter();
+  const {
+    userUuid,
+    selectedCategory,
+    cartItems,
+    setCartItems,
+  } = useBusinessWizard();
 
-  const [equipment, setEquipment] = useState(null);
-  const [advisor, setAdvisor] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [equipmentData, setEquipmentData] = useState(null);
   const [advisorData, setAdvisorData] = useState(null);
-  const [cart, setCart] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [ordering, setOrdering] = useState(false);
-  const [cartItems, setCartItems] = useState([]);
 
   useEffect(() => {
-    if (!userUuid || !category) {
+    if (!userUuid || !selectedCategory) {
       setLoading(false);
       return;
     }
@@ -50,22 +52,17 @@ export default function StepEquipment() {
       setErrorMsg("");
 
       try {
-        const res = await fetch("/api/business", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_uuid: userUuid,
-            bisnis_kategori: category,
-          }),
+        const result = await getBusinessData({
+          userUuid,
+          bisnisKategori: selectedCategory,
+          debug: true,
         });
 
-        const json = await res.json();
-
-        if (json.success) {
-          setEquipmentData(json.equipment);
-          setAdvisorData(json.advisor);
+        if (result.success) {
+          setEquipmentData(result.equipment);
+          setAdvisorData(result.advisor);
         } else {
-          throw new Error(json.error || "Failed to fetch business data");
+          throw new Error(result.error || "Failed to fetch business data");
         }
       } catch (error) {
         console.error("Error fetching business data:", error);
@@ -76,25 +73,24 @@ export default function StepEquipment() {
     };
 
     fetchBusinessData();
-  }, [userUuid, category]);
+  }, [userUuid, selectedCategory]);
 
   const toggleCart = (item) => {
-    const exists = cart.some((p) => p.id === item.id || p.name === item.name);
+    const exists = cartItems.some((p) => p.id === item.id || p.name === item.name);
     if (exists) {
-      setCart(cart.filter((p) => p.id !== item.id && p.name !== item.name));
+      setCartItems(cartItems.filter((p) => p.id !== item.id && p.name !== item.name));
     } else {
-      setCart([...cart, item]);
+      setCartItems([...cartItems, item]);
     }
   };
 
   const handleBack = () => {
-    const params = new URLSearchParams({ userUuid });
-    router.push(`/wizard/business?${params}`);
+    router.push(`/wizard/business?userUuid=${userUuid}`);
   };
 
-  const handleNext = async () => {
-    if (!category) {
-      setErrorMsg("Kategori bisnis diperlukan untuk memproses order.");
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) {
+      setErrorMsg("Pilih minimal satu peralatan dulu.");
       return;
     }
 
@@ -102,28 +98,24 @@ export default function StepEquipment() {
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/business/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userUuid,
-          bisnis_kategori: category,
-          message: "I want to start a business",
-        }),
+      const fakePaymentInfo = {
+        status: "SUCCESS",
+        method: "virtual_account",
+        payment_id: `PAY-${Date.now()}`,
+      };
+
+      const result = await orderEquipment({
+        userUuid,
+        items: cartItems,
+        paymentInfo: fakePaymentInfo,
+        debug: true,
       });
 
       if (result.success) {
-        if (onCheckoutSuccess) {
-          onCheckoutSuccess({
-            cart: cartItems,
-            order: result.order,
-            advisor,
-          });
-        } else {
-          router.push("/wizard/result");
-        }
+        // Navigate to result page
+        router.push(`/wizard/result?userUuid=${userUuid}`);
       } else {
-        throw new Error(json.error || "Gagal memproses order.");
+        throw new Error(result.error || "Order gagal");
       }
     } catch (error) {
       console.error("Error processing order:", error);
@@ -136,12 +128,11 @@ export default function StepEquipment() {
   const requiredItems = equipmentData?.required_items || [];
   const optionalItems = equipmentData?.optional_items || [];
   const allItems = [...requiredItems, ...optionalItems];
-  const totalCartPrice = cart.reduce(
-    (sum, item) => sum + (item.price || 0),
+  const totalCartPrice = cartItems.reduce(
+    (sum, item) => sum + (Number(item.price) || 0),
     0
   );
 
-  // Kalau userUuid nggak ada, anggap sesi sudah habis
   if (!userUuid) {
     return (
       <div className="min-h-screen bg-white px-4 py-8 flex items-center justify-center">
@@ -153,7 +144,7 @@ export default function StepEquipment() {
             </CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button className="w-full" onClick={handleBack}>
+            <Button className="w-full" onClick={() => router.push("/")}>
               Kembali ke awal
             </Button>
           </CardFooter>
@@ -164,12 +155,12 @@ export default function StepEquipment() {
 
   return (
     <div className="min-h-screen bg-white px-4 py-8 flex items-center justify-center">
-      <Card className="w-full max-w-4xl rounded-2xl shadow-lg border border-border/60">
+      <Card className="w-full max-w-5xl rounded-2xl shadow-lg border border-border/60">
         <CardHeader className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em]">
-                Step 3 dari 5
+                Step 3 dari 4
               </div>
               <CardTitle className="text-xl md:text-2xl">
                 Equipment & Strategy
@@ -177,11 +168,11 @@ export default function StepEquipment() {
               <CardDescription className="text-sm">
                 Strategi bisnis dan peralatan yang direkomendasikan berdasarkan kategori bisnis Anda.
               </CardDescription>
-              {category && (
+              {selectedCategory && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   Kategori bisnis:{" "}
                   <span className="font-medium text-foreground">
-                    {category}
+                    {selectedCategory}
                   </span>
                 </p>
               )}
@@ -191,9 +182,8 @@ export default function StepEquipment() {
               variant="ghost"
               size="icon"
               type="button"
-              onClick={onBack}
-              className="hidden md:inline-flex"
               onClick={handleBack}
+              className="hidden md:inline-flex"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -320,7 +310,7 @@ export default function StepEquipment() {
                     </p>
                     <div className="grid gap-4 md:grid-cols-2">
                       {requiredItems.map((item, idx) => {
-                        const selected = cart.some(
+                        const selected = cartItems.some(
                           (p) => p.id === item.id || p.name === item.name
                         );
                         return (
@@ -390,7 +380,7 @@ export default function StepEquipment() {
                     </p>
                     <div className="grid gap-4 md:grid-cols-2">
                       {optionalItems.map((item, idx) => {
-                        const selected = cart.some(
+                        const selected = cartItems.some(
                           (p) => p.id === item.id || p.name === item.name
                         );
                         return (
@@ -478,7 +468,7 @@ export default function StepEquipment() {
                         Rp {totalCartPrice.toLocaleString()}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {cart.length} item dipilih
+                        {cartItems.length} item dipilih
                       </div>
                     </div>
                   </CardContent>
@@ -494,15 +484,15 @@ export default function StepEquipment() {
             size="sm"
             type="button"
             className="w-full md:w-auto"
-            onClick={onBack}
+            onClick={handleBack}
           >
             <ArrowLeft className="h-3.5 w-3.5 mr-1" />
             Kembali
           </Button>
           <Button
             className="w-full md:w-auto"
-            onClick={handleNext}
-            disabled={ordering || !category}
+            onClick={handleCheckout}
+            disabled={ordering || cartItems.length === 0}
           >
             {ordering ? (
               <>
@@ -510,7 +500,7 @@ export default function StepEquipment() {
                 Memproses Order...
               </>
             ) : (
-              `Lanjut ke Result${cart.length > 0 ? ` (${cart.length})` : ""}`
+              `Checkout & Lanjut ke Strategi${cartItems.length > 0 ? ` (${cartItems.length})` : ""}`
             )}
           </Button>
         </CardFooter>

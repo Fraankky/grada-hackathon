@@ -30,7 +30,7 @@ function saveToStorage(data) {
 export function BusinessWizardProvider({ children }) {
   const [userUuid, setUserUuid] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [mode, setMode] = useState(null); // ← TAMBAHKAN INI
+  const [mode, setMode] = useState(null);
   
   // Data analyze
   const [financialAnalysis, setFinancialAnalysis] = useState(null);
@@ -38,6 +38,9 @@ export function BusinessWizardProvider({ children }) {
   const [trendsSummary, setTrendsSummary] = useState("");
   const [categorizedTrends, setCategorizedTrends] = useState({});
   const [validationSummary, setValidationSummary] = useState(null);
+  
+  // Cart items for equipment
+  const [cartItems, setCartItems] = useState([]);
 
   return (
     <BusinessWizardContext.Provider
